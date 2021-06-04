@@ -6,7 +6,7 @@ Boilerplate for C-like languages:
  *                                 Galaxian                                 *
  *                                                                          *
  *                         Copyright © 2021 Aquefir                         *
- *                Released under Mozilla Public License 2.0.                *
+ *                 Released under Artisan Software Licence.                 *
 \****************************************************************************/
 
 Hash-based boilerplate (Python, POSIX shell, Makefile):
@@ -15,5 +15,5 @@ Hash-based boilerplate (Python, POSIX shell, Makefile):
 ##                                 Galaxian                                 ##
 ##                                                                          ##
 ##                         Copyright © 2021 Aquefir                         ##
-##                Released under Mozilla Public License 2.0.                ##
+##                 Released under Artisan Software Licence.                 ##
 ##############################################################################

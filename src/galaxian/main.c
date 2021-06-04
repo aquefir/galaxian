@@ -2,7 +2,7 @@
  *                                 Galaxian                                 *
  *                                                                          *
  *                         Copyright © 2021 Aquefir                         *
- *                Released under Mozilla Public License 2.0.                *
+ *                 Released under Artisan Software Licence.                 *
 \****************************************************************************/
 
 #include <uni/err.h>
@@ -15,6 +15,9 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include "errors.h"
+#include "ini2cfg.h"
 
 typedef u32 platforms_t;
 
@@ -49,47 +52,7 @@ struct pkg
 	ptri srcs_sz;
 };
 
-enum
-{
-	ERRNO_EACCES = 0,
-	ERRNO_ELOOP,
-	ERRNO_ENAMETOOLONG,
-	ERRNO_ENOENT,
-	ERRNO_ENOTDIR,
-	ERRNO_EROFS,
-	ERRNO_EFAULT,
-	ERRNO_EINVAL,
-	ERRNO_EIO,
-	ERRNO_ENOMEM,
-	ERRNO_ETXTBSY,
-	MAX_ERRNO
-};
-
-static const int errs[MAX_ERRNO] = {EACCES,
-	ELOOP,
-	ENAMETOOLONG,
-	ENOENT,
-	ENOTDIR,
-	EROFS,
-	EFAULT,
-	EINVAL,
-	EIO,
-	ENOMEM,
-	ETXTBSY};
-
-static const char * const err_msgs[MAX_ERRNO] = {"Access denied",
-	"Too many symbolic links",
-	"Name too long",
-	"Does not exist or dangling symlink",
-	"Directory component is not a directory",
-	"Cannot write to read-only file system",
-	"Address space access denied",
-	"Mode incorrectly specified",
-	"I/O error",
-	"Insufficient kernel memory",
-	"Cannot write to executable file being executed"};
-
-static void check_rpath( const char * rpath )
+static int check_rpath( const char * rpath )
 {
 	if( access( rpath, F_OK ) == -1 )
 	{
@@ -98,20 +61,19 @@ static void check_rpath( const char * rpath )
 
 		for( i = 0; i < MAX_ERRNO; ++i )
 		{
-			if( errs[i] == e )
+			if( get_errno( i ) == e )
 			{
-				uni_perror( "File error: %s\n", err_msgs[i] );
 				set = 1;
 			}
 		}
 
-		if( !set )
+		if( set )
 		{
-			uni_perror( "File error (unknown)\n" );
+			return 1;
 		}
-
-		uni_die( );
 	}
+
+	return 0;
 }
 
 static void ensure_xfile_exists(
@@ -152,20 +114,32 @@ static void ensure_xfile_exists(
 		const char * pathvar = getenv( "PATH" );
 		const char ** paths =
 			(const char **)uni_strsplit( pathvar, ":", -1 );
-		int i;
+		int i, found = 0;
 
 		for( i = 0; paths[i] != NULL; ++i )
 		{
 			const char * tpath =
-				uni_strjoin( paths[i], "/", path );
+				uni_strjoin( "/", paths[i], path, NULL );
 
-			check_rpath( tpath );
+			if( !check_rpath( tpath ) )
+			{
+				found = 1;
+
+				break;
+			}
+		}
+
+		if( found )
+		{
+			return;
 		}
 	}
-	else
+	else if( check_rpath( path ) )
 	{
-		check_rpath( path );
+		return;
 	}
+
+	uni_die( );
 }
 
 static void ensure_dir_exists(
@@ -238,8 +212,7 @@ static void ensure_elf_as( void )
 		"/usr/local/opt/x86_64-elf-binutils/bin/x86_64-elf-as",
 		PF_MASK_DARWIN,
 		darwin_elf_as_404 );
-	ensure_xfile_exists(
-		"as",
+	ensure_xfile_exists( "as",
 		PF_MASK_LINUX | PF_MASK_ALLBSDS,
 		"GNU as was not found on your system.\nInstall binutils to fix this."
 		"Exiting..." );
@@ -247,9 +220,17 @@ static void ensure_elf_as( void )
 
 int main( int ac, char * av[] )
 {
+	struct ini cfg;
+	int r;
+
 	ensure_elf_as( );
 
-	uni_print( "Succeeded.\n" );
+	r = ini_fromfile( "etc/hinterlib.ini", &cfg );
+
+	if( !r )
+	{
+		uni_print( "Succeeded.\n" );
+	}
 
 	return 0;
 }

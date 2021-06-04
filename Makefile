@@ -2,7 +2,7 @@
 ##                                 Galaxian                                 ##
 ##                                                                          ##
 ##                         Copyright © 2021 Aquefir                         ##
-##                Released under Mozilla Public License 2.0.                ##
+##                 Released under Artisan Software Licence.                 ##
 ##############################################################################
 
 ifeq ($(strip $(AQ)),)
@@ -26,7 +26,7 @@ INCLUDES :=
 INCLUDEL := src
 
 # space-separated library name list
-LIBS    := uni_err uni_log uni_str uni_himem
+LIBS    := uni_err uni_futils uni_log uni_str uni_himem
 LIBDIRS :=
 
 # ‘3P’ are in-tree 3rd-party dependencies
@@ -41,10 +41,14 @@ FWORKS :=
 # sources
 SFILES    :=
 CFILES    := \
+	src/galaxian/errors.c \
+	src/galaxian/ini2cfg.c \
 	src/galaxian/main.c
 CPPFILES  :=
 PUBHFILES :=
-PRVHFILES :=
+PRVHFILES := \
+	src/galaxian/errors.h \
+	src/galaxian/ini2cfg.h
 
 # test suite sources
 TES_CFILES    :=
