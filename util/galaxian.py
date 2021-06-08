@@ -5,12 +5,12 @@ import os
 import urllib.request
 import hashlib
 from shutil import move, rmtree, unpack_archive
-from sys import stderr
+from sys import platform, stderr
 from tempfile import mkdtemp, mkstemp
 
 def run(command):
 	import subprocess
-	from sys import exit, stderr
+	from sys import exit
 	try:
 		return subprocess.check_output(command).decode()
 	except subprocess.CalledProcessError as e:
@@ -98,13 +98,55 @@ Copyright © 2021 Aquefir
 Released under Artisan Software Licence.
 
 Usage:-
-\tgalaxian -h|--help                  Print this text.
+\tgalaxian [-h|--help]                Print this text.
 \tgalaxian -c <file>|--config=<file>  Read <file> as INI config.
 \t         [-p <TP>|--platform=<TP>]  Build package for <TP>.
 
 \tIf no -p arguments are given, none are passed to Slick, which defaults
 \tto a native build only.
 '''
+
+MAKE = 'gmake' if platform == 'darwin' else 'make'
+
+TP2ARCHIVE = {
+	'DARWIN': 'darwin',
+	'LINUX': 'linux64',
+	'LINUX86': 'linux32',
+	'LINUXARM': 'linuxarm',
+	'WIN32': 'win32',
+	'WIN64': 'win64',
+	'GBA': 'agb',
+	'IBMPC': 'ibmpc',
+	'DOS': 'dos',
+	'APE': 'portable'
+}
+
+def makeproject(cwd, ident, ver, tp, pkgdir, outdir):
+	# Uppercase for the TP for keying and Slick
+	oldcwd = os.getcwd()
+	# Dictate the output prefix
+	fakeroot = os.path.join(pkgdir, 'opt', 'aq')
+	# If building for hosting targets, it must be native
+	if tp == 'DARWIN':
+		if platform != 'darwin': raise \
+			Exception('Cannot build for macOS (Darwin) from non-Darwin host.')
+	elif tp == 'LINUX':
+		if platform != 'linux': raise \
+			Exception('Cannot build for GNU/Linux from non-Linux host.')
+	else:
+		# xpdevel = “cross-platform development”
+		fakeroot = os.path.join(fakeroot, 'xpdevel', TP2ARCHIVE[tp])
+	# Create the output directory
+	try:
+		os.makedirs(fakeroot)
+	except:
+		pass
+	os.chdir(os.path.join(outdir, cwd))
+	# Build the software
+	run([MAKE, 'release', 'TP=' + tp])
+	# Install it into the output directory
+	run([MAKE, 'install', 'TP=' + tp, 'PREFIX=' + fakeroot])
+	os.chdir(oldcwd)
 
 def main(args):
 	argc = len(args)
@@ -129,7 +171,7 @@ def main(args):
 			if cfg != '':
 				print('WARNING: Config file specified multiple times.\n' +
 					'Using the last value given...', file=stderr)
-			cfg = arg[9:]
+			cfg = arg[len('--config='):]
 		elif arg == '-p' or arg == '--platform':
 			if i + 1 >= argc:
 				print('Dangling -p argument. Exiting...', file=stderr)
@@ -141,20 +183,26 @@ def main(args):
 		else:
 			print('WARNING: Unknown argument %s. Ignoring...' % arg, file=stderr)
 		i += 1
-	print(cfg, file=stderr)
-	return 0
 	f = open('etc/hinterlib.ini', 'r')
 	ini = parse_ini(f.read())
 	f.close()
 	cfg = parse_cfg(ini)
-	o_cwd = os.getcwd()
-	os.chdir()
-	print(cfg)
-	rmtree(cfg['outdir'])
+	# Make the output directory
+	pkgdir = mkdtemp()
+	# Make the output archive
+	tarfd, tarfname = mkstemp(prefix=pkgdir, suffix='.tar.lz')
 	i = 0
 	projs_sz = len(cfg['projs'])
 	while i < projs_sz:
+		makeproject(cfg['projs'][i], cfg['ident'], cfg['ver'], platform.upper(), pkgdir, cfg['outdir'])
 		i += 1
+	# Change dirs to tarball the binaries
+	os.chdir(pkgdir)
+	run(['tar', '-cf', tarfname, '-I', 'lzip -9q', '.'])
+	# Go back
+	os.chdir(cfg['outdir'])
+	print(cfg)
+	move(tarfname, cfg['ident'] + '-' + cfg['ver'] + '-' + TP2ARCHIVE[platform.upper()] + '.galpkg.tar.lz')
 	return 0
 
 if __name__ == '__main__':
